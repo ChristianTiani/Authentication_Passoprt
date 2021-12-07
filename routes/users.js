@@ -1,5 +1,30 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcrypt');
+const mysql = require("mysql");
+
+require("dotenv").config()
+const DB_HOST = process.env.DB_HOST
+const DB_USER = process.env.DB_USER
+const DB_PASSWORD = process.env.DB_PASSWORD
+const DB_DATABASE = process.env.DB_DATABASE
+const DB_PORT = process.env.DB_PORT
+
+const db = mysql.createPool({
+    connectionLimit: 100,
+    host: DB_HOST,       //This is your localhost IP
+    user: DB_USER,         // "newuser" created in Step 1(e)
+    password: DB_PASSWORD,  // password for the new user
+    database: DB_DATABASE,      // Database name
+    port: DB_PORT             // port name, "3306" by default
+ })
+ 
+ 
+ db.getConnection( (err, connection)=> {
+    if (err) throw (err)
+    console.log ("DB connected successful: " + connection.threadId)
+ })
+
 
 // Login Page
 router.get('/login', (req, res) => res.render('login'));
@@ -37,7 +62,53 @@ router.post('/register', (req, res) => {
             password2
         });
     } else {
-        res.send('pass');
+        // User validation passed
+        res.send('pass');        
+
+        //const hashedPassword = await bcrypt.hash(password,10); //NOTE Need to Check how to use with bcryptjs
+        const hashedPassword = bcrypt.hash(password,10); //NOTE Need to Check how to use with bcryptjs
+        db.getConnection( async (err, connection) => {
+            if (err) throw (err)
+            const sqlSearch = "SELECT * FROM userschema WHERE email = ?"
+            const search_query = mysql.format(sqlSearch,[email])
+            const sqlInsert = "INSERT INTO userschema VALUES (0,?,?,?)"
+            const insert_query = mysql.format(sqlInsert,[name, email, hashedPassword])
+            // ? will be replaced by values
+            // ?? will be replaced by string
+            
+            await connection.query (search_query, async (err, result) => {
+       
+             if (err) throw (err)
+             console.log("------> Search Results")
+             console.log(result.length)
+       
+             if (result.length != 0) {
+              connection.release()
+              errors.push({ msg: 'Email is already registered' });
+              res.render('register', {
+                errors,
+                name,
+                email,
+                password,
+                password2
+                });
+              console.log("------> User already exists")
+              res.sendStatus(409) 
+             } 
+             else {
+              console.log(insert_query)
+            //   await connection.query (insert_query, (err, result)=> {
+       
+            //   connection.release()
+       
+            //   if (err) throw (err)
+            //   console.log ("--------> Created new User")
+            //   console.log(result.insertId)
+            //   res.sendStatus(201)
+            //  })
+            }
+           }) //end of connection.query()
+        }) //end of db.getConnection()
     }
 });
 
