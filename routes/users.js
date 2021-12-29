@@ -2,7 +2,13 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const mysql = require("mysql");
+const passport = require('passport');
 
+const { forwardAuthenticated } = require('../config/auth');
+
+var datetime = new Date()
+
+// Connect to the database
 require("dotenv").config()
 const DB_HOST = process.env.DB_HOST
 const DB_USER = process.env.DB_USER
@@ -27,10 +33,10 @@ const db = mysql.createPool({
 
 
 // Login Page
-router.get('/login', (req, res) => res.render('login'));
+router.get('/login', forwardAuthenticated, (req, res) => res.render('login'));
 
 // Register Page
-router.get('/register', (req, res) => res.render('register'));
+router.get('/register', forwardAuthenticated, (req, res) => res.render('register'));
 
 // Register handle
 router.post('/register', (req, res) => {
@@ -71,14 +77,14 @@ router.post('/register', (req, res) => {
         bcrypt.genSalt(10, (err, salt) => {
             bcrypt.hash(password, salt, (err, hash) => {
                 if(err) throw err;
-                hashedPassword = hash;
+                hashedPassword = hash;                 
 
                 db.getConnection( async (err, connection) => {
                     if (err) throw (err)
                     const sqlSearch = "SELECT * FROM userschema WHERE email = ?"
                     const search_query = mysql.format(sqlSearch,[email])
-                    const sqlInsert = "INSERT INTO userschema VALUES (0,?,?,?)"
-                    const insert_query = mysql.format(sqlInsert,[name, email, hashedPassword])
+                    const sqlInsert = "INSERT INTO userschema VALUES (0,?,?,?,?)"
+                    const insert_query = mysql.format(sqlInsert,[name, email, hashedPassword, datetime])
                     // ? will be replaced by values
                     // ?? will be replaced by string
                     
@@ -104,15 +110,15 @@ router.post('/register', (req, res) => {
                      else {
                       console.log(insert_query)                      
                       
-                    //   await connection.query (insert_query, (err, result)=> {
+                      await connection.query (insert_query, (err, result)=> {
                
-                    //   connection.release()
+                      connection.release()
                
-                    //   if (err) throw (err)
-                    //   console.log ("--------> Created new User")
-                    //   console.log(result.insertId)
-                    //   res.sendStatus(201)
-                    //  })
+                      if (err) throw (err)
+                      console.log ("--------> Created new User")
+                      console.log(result.insertId)
+                      //res.sendStatus(201)
+                     })
                       req.flash(
                         'success_msg',
                         'You are now registered and can log in'
@@ -129,4 +135,19 @@ router.post('/register', (req, res) => {
     }
 });
 
+// Login
+router.post('/login', (req, res, next) => {
+    passport.authenticate('local', {
+      successRedirect: '/dashboard',
+      failureRedirect: '/users/login',
+      failureFlash: true
+    })(req, res, next);
+  });
+  
+  // Logout
+  router.get('/logout', (req, res) => {
+    req.logout();
+    req.flash('success_msg', 'You are logged out');
+    res.redirect('/users/login');
+  });
 module.exports = router;
