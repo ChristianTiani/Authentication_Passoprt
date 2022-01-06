@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const mysql = require("mysql");
 const passport = require('passport');
 
-const { forwardAuthenticated } = require('../config/auth');
+const { ensureAuthenticated, forwardAuthenticated } = require('../config/auth');
 
 var datetime = new Date()
 
@@ -37,6 +37,10 @@ router.get('/login', forwardAuthenticated, (req, res) => res.render('login'));
 
 // Register Page
 router.get('/register', forwardAuthenticated, (req, res) => res.render('register'));
+
+// Payment Page
+router.get('/payment', ensureAuthenticated, (req, res) => res.render('payment'));
+
 
 // Register handle
 router.post('/register', (req, res) => {
